@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TODO Task Manager</title>
+    <link rel="stylesheet" href="css/styles.css">
+
+    
+</head>
+<body>
+    <div class="container">
+        <h1>📝 TODO Task Manager</h1>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalTasks">0</div>
+                <div class="stat-label">Total Tasks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="personalTasks">0</div>
+                <div class="stat-label">Personal</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="workTasks">0</div>
+                <div class="stat-label">Work</div>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-category="all">All Tasks</button>
+            <button class="nav-tab" data-category="personal">Personal</button>
+            <button class="nav-tab" data-category="work">Work</button>
+        </div>
+
+        <div class="add-task-section">
+            <h3 style="margin-bottom: 15px; color: #333;">Add New Task</h3>
+            <form class="add-task-form" id="addTaskForm">
+                <div class="form-group">
+                    <label for="taskTitle">Task Title</label>
+                    <input type="text" id="taskTitle" class="task-input" placeholder="Enter task description..." required>
+                </div>
+                <div class="form-group">
+                    <label for="taskCategory">Category</label>
+                    <select id="taskCategory" class="category-select" required>
+                        <option value="personal">Personal</option>
+                        <option value="work">Work</option>
+                    </select>
+                </div>
+                <button type="submit" class="add-btn">Add Task</button>
+            </form>
+        </div>
+
+        <div class="tasks-container" id="tasksContainer">
+            <div class="empty-state" id="emptyState">
+                No tasks yet. Add your first task above! 🚀
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Task storage and management
+        let tasks = [];
+        let currentFilter = 'all';
+        let taskIdCounter = 1;
+
+        // DOM elements
+        const tasksContainer = document.getElementById('tasksContainer');
+        const addTaskForm = document.getElementById('addTaskForm');
+        const taskTitleInput = document.getElementById('taskTitle');
+        const taskCategorySelect = document.getElementById('taskCategory');
+        const navTabs = document.querySelectorAll('.nav-tab');
+        const emptyState = document.getElementById('emptyState');
+        const totalTasksEl = document.getElementById('totalTasks');
+        const personalTasksEl = document.getElementById('personalTasks');
+        const workTasksEl = document.getElementById('workTasks');
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+            renderTasks();
+            updateStats();
+        });
+
+        // Add task form submission
+        addTaskForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            addTask();
+        });
+
+        // Navigation tab clicks
+        navTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const category = this.dataset.category;
+                setActiveTab(category);
+                filterTasks(category);
+            });
+        });
+
+        // Add new task
+        function addTask() {
+            const title = taskTitleInput.value.trim();
+            const category = taskCategorySelect.value;
+            
+            if (!title) return;
+
+            const newTask = {
+                id: taskIdCounter++,
+                title: title,
+                category: category,
+                createdAt: new Date().toISOString(),
+                completed: false
+            };
+
+            tasks.push(newTask);
+            saveTasks();
+            renderTasks();
+            updateStats();
+            
+            // Reset form
+            taskTitleInput.value = '';
+            taskCategorySelect.value = 'personal';
+            
+            // Show success animation
+            showTaskAddedAnimation();
+        }
+
+        // Delete task
+        function deleteTask(taskId) {
+            if (confirm('Are you sure you want to delete this task?')) {
+                tasks = tasks.filter(task => task.id !== taskId);
+                saveTasks();
+                renderTasks();
+                updateStats();
+            }
+        }
+
+        // Render tasks based on current filter
+        function renderTasks() {
+            const filteredTasks = getFilteredTasks();
+            
+            if (filteredTasks.length === 0) {
+                tasksContainer.innerHTML = `
+                    <div class="empty-state">
+                        ${currentFilter === 'all' ? 'No tasks yet. Add your first task above! 🚀' : 
+                          `No ${currentFilter} tasks found. Try adding some! 📋`}
+                    </div>
+                `;
+                return;
+            }
+
+            tasksContainer.innerHTML = filteredTasks.map(task => `
+                <div class="task-card ${task.category}" data-task-id="${task.id}">
+                    <div class="task-title">${escapeHtml(task.title)}</div>
+                    <div class="task-category ${task.category}">${task.category}</div>
+                    <div class="task-date">Created: ${formatDate(task.createdAt)}</div>
+                    <div class="task-actions">
+                        <button class="delete-btn" onclick="deleteTask(${task.id})">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Get filtered tasks based on current filter
+        function getFilteredTasks() {
+            if (currentFilter === 'all') {
+                return tasks;
+            }
+            return tasks.filter(task => task.category === currentFilter);
+        }
+
+        // Set active navigation tab
+        function setActiveTab(category) {
+            navTabs.forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.category === category) {
+                    tab.classList.add('active');
+                }
+            });
+        }
+
+        // Filter tasks by category
+        function filterTasks(category) {
+            currentFilter = category;
+            renderTasks();
+        }
+
+        // Update statistics
+        function updateStats() {
+            const personalCount = tasks.filter(task => task.category === 'personal').length;
+            const workCount = tasks.filter(task => task.category === 'work').length;
+            
+            totalTasksEl.textContent = tasks.length;
+            personalTasksEl.textContent = personalCount;
+            workTasksEl.textContent = workCount;
+        }
+
+        // Save tasks to localStorage (simulating database)
+        function saveTasks() {
+            try {
+                // Note: In a real application, this would be an API call to the server
+                // For this demo, we're using in-memory storage
+                console.log('Tasks saved:', tasks);
+            } catch (error) {
+                console.error('Error saving tasks:', error);
+            }
+        }
+
+        // Load tasks from localStorage (simulating database fetch)
+        function loadTasks() {
+            try {
+                // Note: In a real application, this would be an API call to fetch from server
+                // For this demo, we're starting with empty array
+                tasks = [];
+                console.log('Tasks loaded:', tasks);
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                tasks = [];
+            }
+        }
+
+        // Utility functions
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showTaskAddedAnimation() {
+            const btn = document.querySelector('.add-btn');
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Added!';
+            btn.style.background = 'linear-gradient(45deg, #28a745, #34ce57)';
+            
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = 'linear-gradient(45deg, #667eea, #764ba2)';
+            }, 1000);
+        }
+
+        // Sample data for demonstration
+        function loadSampleData() {
+            tasks = [
+                {
+                    id: 1,
+                    title: "Complete project documentation",
+                    category: "work",
+                    createdAt: new Date(Date.now() - 86400000).toISOString(),
+                    completed: false
+                },
+                {
+                    id: 2,
+                    title: "Buy groceries for the week",
+                    category: "personal",
+                    createdAt: new Date(Date.now() - 172800000).toISOString(),
+                    completed: false
+                },
+                {
+                    id: 3,
+                    title: "Schedule team meeting",
+                    category: "work",
+                    createdAt: new Date().toISOString(),
+                    completed: false
+                },
+                {
+                    id: 4,
+                    title: "Call dentist for appointment",
+                    category: "personal",
+                    createdAt: new Date().toISOString(),
+                    completed: false
+                }
+            ];
+            taskIdCounter = 5;
+            renderTasks();
+            updateStats();
+        }
+
+        // Load sample data on page load for demonstration
+        setTimeout(loadSampleData, 1000);
+    </script>
+</body>
+</html>
